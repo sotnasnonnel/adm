@@ -4,6 +4,7 @@ import re
 import os
 from PyPDF2 import PdfReader, PdfWriter
 from io import BytesIO
+import zipfile
 
 # Função para extrair nome de uma página do PDF
 def extract_name_from_page(page_text):
@@ -14,7 +15,6 @@ def extract_name_from_page(page_text):
 
 # Função para dividir PDF por páginas e renomear pelos nomes
 def split_pdf_by_pages_clt(input_pdf, output_dir):
-    # Certifique-se de que o diretório de saída existe
     os.makedirs(output_dir, exist_ok=True)
     
     reader = PdfReader(input_pdf)
@@ -46,52 +46,41 @@ def extract_employee_names_with_refined_cbo(pdf_path):
     for page_num in range(len(document)):
         page = document.load_page(page_num)
         text = page.get_text("text")
-
-        # Split the text into lines and look for the employee name by finding the CBO line
         lines = text.split('\n')
         for i, line in enumerate(lines):
             if re.search(r'\b\d{6}\b', line):  # Pattern to match CBO code (6 digits)
-                # Extract the name from a few lines before the CBO line
                 for j in range(i - 3, i):
                     if j >= 0:
                         name_line = lines[j].strip()
                         if name_line and not any(keyword in name_line for keyword in ["Nome do Funcionário", "Departamento", "Filial", "Mensalista", "Admissão", "Folha Mensal"]) and not name_line.isdigit():
                             names.append(name_line)
                             break
-                break  # Go to the next page after finding the name
+                break
 
     return names
 
 # Função para dividir PDF por páginas e renomear pelos nomes
 def split_pdf_by_pages_colaborador(uploaded_file, output_dir):
-    # Save the uploaded file temporarily
     input_pdf_path = "uploaded_file.pdf"
     with open(input_pdf_path, "wb") as f:
         f.write(uploaded_file.read())
     
-    # Extract employee names
     employee_names = extract_employee_names_with_refined_cbo(input_pdf_path)
     
     saved_files = []
     document = fitz.open(input_pdf_path)
     
-    # Create the output directory if it doesn't exist
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     
     for page_num, name in enumerate(employee_names):
         writer = PdfWriter()
         page = document.load_page(page_num)
-        
-        # Create a new PDF in memory with the single page
-        single_page_pdf = fitz.open()  # Create a new empty PDF
+        single_page_pdf = fitz.open()
         single_page_pdf.insert_pdf(document, from_page=page_num, to_page=page_num)
-        
-        # Convert the single page PDF to bytes
         pdf_bytes = single_page_pdf.tobytes()
         pdf_bytes_io = BytesIO(pdf_bytes)
         pdf_reader = PdfReader(pdf_bytes_io)
-        
         writer.add_page(pdf_reader.pages[0])
 
         output_path = os.path.join(output_dir, f"{name}.pdf")
@@ -100,6 +89,15 @@ def split_pdf_by_pages_colaborador(uploaded_file, output_dir):
             saved_files.append(output_path)
     
     return saved_files
+
+# Função para criar um arquivo zip de vários arquivos
+def create_zip_file(file_paths):
+    zip_buffer = BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        for file_path in file_paths:
+            zip_file.write(file_path, os.path.basename(file_path))
+    zip_buffer.seek(0)
+    return zip_buffer
 
 # Função principal
 def main():
@@ -117,18 +115,16 @@ def main():
                     saved_files = split_pdf_by_pages_clt(uploaded_file, output_dir)
                 st.success("Processamento completo!")
                 st.write("Arquivos salvos:")
-                for file in saved_files:
-                    with open(file, "rb") as pdf_file:
-                        st.download_button(label="Baixar " + os.path.basename(file), data=pdf_file, file_name=os.path.basename(file), mime="application/pdf")
+                zip_buffer = create_zip_file(saved_files)
+                st.download_button(label="Baixar todos os PDFs", data=zip_buffer, file_name="pdfs.zip", mime="application/zip")
         elif page == "CLT":
             if st.button("Processar PDF"):
                 with st.spinner("Processando..."):
                     saved_files = split_pdf_by_pages_colaborador(uploaded_file, output_dir)
                 st.success("Processamento completo!")
                 st.write("Arquivos salvos:")
-                for file in saved_files:
-                    with open(file, "rb") as pdf_file:
-                        st.download_button(label="Baixar " + os.path.basename(file), data=pdf_file, file_name=os.path.basename(file), mime="application/pdf")
+                zip_buffer = create_zip_file(saved_files)
+                st.download_button(label="Baixar todos os PDFs", data=zip_buffer, file_name="pdfs.zip", mime="application/zip")
 
 if __name__ == "__main__":
     main()
