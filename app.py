@@ -108,9 +108,9 @@ def main():
     page = st.sidebar.selectbox("Selecione a página", ["Colaborador", "CLT"])
     
     uploaded_file = st.file_uploader("Carregue um arquivo PDF", type="pdf")
-    output_dir = st.text_input("Digite o caminho do diretório onde deseja salvar os arquivos PDF")
+    output_dir = "output"  # Diretório temporário para salvar os arquivos
 
-    if uploaded_file is not None and output_dir:
+    if uploaded_file is not None:
         if page == "Colaborador":
             if st.button("Processar PDF"):
                 with st.spinner("Processando..."):
@@ -118,7 +118,8 @@ def main():
                 st.success("Processamento completo!")
                 st.write("Arquivos salvos:")
                 for file in saved_files:
-                    st.write(file)
+                    with open(file, "rb") as pdf_file:
+                        st.download_button(label="Baixar " + os.path.basename(file), data=pdf_file, file_name=os.path.basename(file), mime="application/pdf")
         elif page == "CLT":
             if st.button("Processar PDF"):
                 with st.spinner("Processando..."):
@@ -126,7 +127,8 @@ def main():
                 st.success("Processamento completo!")
                 st.write("Arquivos salvos:")
                 for file in saved_files:
-                    st.write(file)
+                    with open(file, "rb") as pdf_file:
+                        st.download_button(label="Baixar " + os.path.basename(file), data=pdf_file, file_name=os.path.basename(file), mime="application/pdf")
 
 if __name__ == "__main__":
     main()
